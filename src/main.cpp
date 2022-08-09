@@ -14,17 +14,21 @@ const int breaks_per_rev = 3;
 const float radius = 40e-03; 
 const float circumfence = 2*radius*PI;
 
-//=====> evaluation conf
+//=====> buffer conf
 const int buf_length = 10;
 volatile int buf_index = 0;
 unsigned long time_buf[buf_length];
 unsigned long last_trigger_time = 0;
 
+//=====> evaluation conf
+const unsigned long eval_interval = 1000;
+unsigned long last_eval_time = 0;
+
 
 void tick(){
   buf_index = (buf_index+1)%buf_length;
-  time_buf[eval_index] = millis() - last_trigger_time;
-  last_trigger_time = time_buf[eval_index];
+  time_buf[buf_index] = millis() - last_trigger_time;
+  last_trigger_time = time_buf[buf_index];
 }
 
 void setup() {
@@ -37,29 +41,20 @@ void setup() {
     Serial.begin(115200);
   }
 
+  for (int i = 0; i < buf_index; i++){
+    time_buf[i] = 0;
+  }
+
   // attach interrupts
   attachInterrupt(digitalPinToInterrupt(2),tick, FALLING);
 }
 
-unsigned long last_eval_time = 0;
 void loop() {
   check_eval();
 }
 
 void check_eval(){
-  if (millis()-last_eval_time >= evaluation_duration){
-    float delta_time = float(millis()-last_eval_time)/1000;
+  if (millis()-last_eval_time >= eval_interval){
     last_eval_time = millis();
-    float revolutions = float(count)/breaks_per_rev;
-    float frequency = revolutions/delta_time;
-    float outer_vel = (frequency*circumfence);
-    if (SERIAL_ENABLE) {
-      Serial.print("\tfrequency [1/s]: \t");
-      Serial.print(frequency);
-      Serial.print("\tvelocity [m/s]: \t");
-      Serial.print(outer_vel);
-      Serial.print('\n');
-    }
-    count = 0;
   }
 }
