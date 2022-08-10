@@ -25,7 +25,7 @@ const unsigned long eval_interval = 1000;
 unsigned long last_eval_time = 0;
 
 //=====> idle conf
-const unsigned long idle_timeout = 1000;
+const unsigned long idle_timeout = 800;
 volatile bool is_idle = false;
 volatile bool clear_buf = false;
 
@@ -84,12 +84,13 @@ void check_eval() {
     last_eval_time = millis();
     float period = mean_time() * 3;
     float frequency = 1000 / period;
+    float peripherial_speed = frequency * circumfence;
 #if ENABLE_SERIAL
-    Serial.print("period: ");
-    Serial.print(period);
-    Serial.print(" ms\tfrequency: ");
+    Serial.print("frequency: ");
     Serial.print(frequency);
-    Serial.println(" Hz");
+    Serial.print(" Hz\tperipheral speed: ");
+    Serial.print(peripherial_speed);
+    Serial.println(" m/s");
 #endif
   }
 }
