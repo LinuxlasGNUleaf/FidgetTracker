@@ -1,18 +1,18 @@
 #include <Arduino.h>
 #include <main.h>
 
-#define SERIAL_ENABLE true
-
+#define ENABLE_SERIAL true
+#define ENABLE_BUZZER false
 
 //=====> hardware conf
-const int buzzer_pin = 8;
+const int buzzer_pin = 3;
 const int transistor_pin = 2;
 
 //=====> spinner conf
 const int breaks_per_rev = 3;
 // radius in mm
-const float radius = 40e-03; 
-const float circumfence = 2*radius*PI;
+const float radius = 40e-03;
+const float circumfence = 2 * radius * PI;
 
 //=====> buffer conf
 const int buf_length = 10;
@@ -24,37 +24,107 @@ unsigned long last_trigger_time = 0;
 const unsigned long eval_interval = 1000;
 unsigned long last_eval_time = 0;
 
+//=====> idle conf
+const unsigned long idle_timeout = 1000;
+volatile bool is_idle = false;
+volatile bool clear_buf = false;
 
-void tick(){
-  buf_index = (buf_index+1)%buf_length;
-  time_buf[buf_index] = millis() - last_trigger_time;
-  last_trigger_time = time_buf[buf_index];
+void tick() {
+  // calculate delta_time and set last_trigger_time
+  unsigned long delta_time = millis() - last_trigger_time;
+  last_trigger_time = millis();
+
+  if (delta_time >= idle_timeout) {
+    // if idle condition was not met before, set clear_buf flag
+    if (!is_idle)
+      clear_buf = true;
+    // idle condition is met, set flags accordingly
+    is_idle = true;
+  } else {
+    if (!is_idle) {
+      // idle condition wasn't met before, proceed normally
+      buf_index = (buf_index + 1) % buf_length;
+      time_buf[buf_index] = delta_time;
+#if ENABLE_BUZZER
+      tone(buzzer_pin, 440, 3);
+#endif
+    } else {
+      // was idle before, reset idle flag
+      is_idle = false;
+    }
+  }
 }
 
 void setup() {
-  // pin setup
+// pin setup
+#if ENABLE_BUZZER
   pinMode(buzzer_pin, OUTPUT);
-  pinMode(transistor_pin,INPUT);
+#endif
+  pinMode(transistor_pin, INPUT);
 
-  // serial setup
-  if (SERIAL_ENABLE){
-    Serial.begin(115200);
-  }
+// serial setup
+#if ENABLE_SERIAL
+  Serial.begin(115200);
+#endif
 
-  for (int i = 0; i < buf_index; i++){
-    time_buf[i] = 0;
-  }
+  // prep the buffer
+  clear_time_buf();
 
   // attach interrupts
-  attachInterrupt(digitalPinToInterrupt(2),tick, FALLING);
+  attachInterrupt(digitalPinToInterrupt(transistor_pin), tick, FALLING);
 }
 
 void loop() {
   check_eval();
+  check_idle();
 }
 
-void check_eval(){
-  if (millis()-last_eval_time >= eval_interval){
+void check_eval() {
+  if (millis() - last_eval_time >= eval_interval) {
     last_eval_time = millis();
+    float period = mean_time() * 3;
+    float frequency = 1000 / period;
+#if ENABLE_SERIAL
+    Serial.print("period: ");
+    Serial.print(period);
+    Serial.print(" ms\tfrequency: ");
+    Serial.print(frequency);
+    Serial.println(" Hz");
+#endif
   }
+}
+
+float mean_time() {
+  unsigned int count = 0;
+  unsigned long sum = 0;
+
+  if (is_idle)
+    return INFINITY;
+
+  for (int i = 0; i < buf_length; i++) {
+    if (time_buf[i] != __LONG_MAX__) {
+      count++;
+      sum += time_buf[i];
+    }
+  }
+
+  if (count != 0) {
+    return float(sum) / count;
+  }
+  return INFINITY;
+}
+
+void check_idle() {
+  if (clear_buf) {
+    clear_buf = false;
+    clear_time_buf();
+  }
+}
+
+void clear_time_buf() {
+  noInterrupts();
+  for (int i = 0; i < buf_length; i++) {
+    time_buf[i] = __LONG_MAX__;
+  }
+  interrupts();
 }
