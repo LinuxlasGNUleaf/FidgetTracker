@@ -4,3 +4,5 @@
 .vscode/launch.json
 .vscode/ipch
 .vscode
+
+!.pio/libdeps/nanoatmega328new/U8g2/src/clib/u8g2.h
