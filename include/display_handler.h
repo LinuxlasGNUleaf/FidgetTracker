@@ -7,8 +7,16 @@ private:
 
 public:
   DisplayHandler();
+  
   void init();
-  void drawStr(int x, int y, const char *str);
+  void clearBuffer();
+  void sendBuffer();
+
+  void drawBigStr(int x, int y, const char *str);
+  void drawMedStr(int x, int y, const char *str);
+  void drawSmallStr(int x, int y, const char *str);
   void drawLine(int x1, int y1, int x2, int y2);
+
   void drawGauge(int x1, int y1, int x2, int y2, double percent);
+  void drawPlate(int x1, int y1, int x2, int y2, int r, bool bolts);
 };

@@ -19,9 +19,7 @@ const float radius = 40e-03;
 const float circumfence = 2 * radius * PI;
 
 //======> filter conf
-const float filter_agressivity = 0.2f;
-#define FILTER(x, last_x) (x <= filter_agressivity * last_x)
-volatile unsigned long last_delta_time;
+const int filter_min_delta_time = 10;
 
 //=====> buffer conf
 const int buf_length = 10;
@@ -35,7 +33,7 @@ volatile bool is_idle = false;
 volatile bool clear_buf = false;
 
 //=====> eval variables
-double period, frequency, peripherial_speed;
+float period, frequency, peripherial_speed;
 
 //=====> display conf
 const unsigned long display_update_interval = 250;
@@ -45,13 +43,18 @@ DisplayHandler displayHandler = DisplayHandler();
 void tick() {
   // calculate delta_time and set last_trigger_time
   unsigned long delta_time = millis() - last_trigger_time;
-  if (FILTER(delta_time, last_delta_time)) {
+  if (delta_time < filter_min_delta_time) {
+    #if ENABLE_SERIAL
+      Serial.println("Datapoint discarded.");
+    #endif
     return;
   }
-  last_delta_time = delta_time;
   last_trigger_time = millis();
 
   if (delta_time >= idle_timeout) {
+    #if ENABLE_SERIAL
+    Serial.println("Entering Idle mode.");
+    #endif
     // if idle condition was not met before, set clear_buf flag
     if (!is_idle)
       clear_buf = true;
@@ -133,6 +136,9 @@ float mean_time() {
 
 void check_idle() {
   if (millis()-last_trigger_time >= idle_timeout){
+    #if ENABLE_SERIAL
+    Serial.println("Enabling IDLE due to inactivity");
+    #endif
     is_idle = true;
     clear_buf = true;
   }
@@ -146,8 +152,9 @@ void update_display() {
   if (millis() - last_display_update >= display_update_interval) {
     last_display_update = millis();
     eval_data();
-    displayHandler.drawGauge(2, 2, 62, 30,
-                             constrain(frequency / 30, 0.0f, 1.0f));
+    displayHandler.clearBuffer();
+    displayHandler.drawGauge(2, 2, 61, 30, constrain(frequency / 30, 0.0f, 1.0f));
+    displayHandler.sendBuffer();
   }
 }
 
